@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Reel Content Engine</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #f1f5f9; /* Warm premium slate gray */
+            --bg-surface: #ffffff;
+            --bg-inner: #f8fafc;
+            --border: #e2e8f0;
+            --border-focus: #4f46e5;
+            
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            
+            --accent-glow: #4f46e5; /* Royal Purple Focus */
+            --accent-tag: #0d9488; /* Fresh Turquoise */
+            --accent-hashtag: #db2777; /* Punchy Rose Pink */
+        }
+
+        * { box-sizing: border-box; transition: transform 0.2s, background-color 0.2s, border-color 0.2s; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-base);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Lock master page viewport scroll */
+            letter-spacing: -0.01em;
+        }
+
+        /* PREMIUM DASHBOARD NAVIGATION BAR */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            height: 64px;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        .brand { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em; }
+        .brand span { color: var(--accent-glow); position: relative; }
+        .brand span::after { content: '✨'; position: absolute; right: -18px; top: -2px; font-size: 12px; }
+
+        /* THE UNIFIED HORIZONTAL SPLIT GRID */
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr;
+            height: calc(100vh - 64px);
+            overflow: hidden;
+        }
+        @media (min-width: 1024px) {
+            .workspace { grid-template-columns: 420px 1fr; } /* Isolated side-by-side split */
+        }
+
+        /* LEFT DOCK: SETTINGS & INPUT SIDEBAR */
+        .sidebar-dock {
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            padding: 24px;
+            overflow-y: auto; /* Independent inner scrolling */
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            height: 100%;
+        }
+        @media (min-width: 1024px) {
+            .sidebar-dock { border-bottom: none; border-right: 1px solid var(--border); }
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* INGESTION FILE DROPZONE */
+        .dropzone {
+            border: 2px dashed #b4c6ef;
+            background: var(--bg-inner);
+            border-radius: 14px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .dropzone:hover { border-color: var(--border-focus); background: #ffffff; }
+        .dropzone p { margin: 0; font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+        .dropzone b { color: var(--accent-glow); }
+
+        /* SCROLLABLE PILL DICTIONARIES */
+        .tags-pool {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-height: 150px;
+            overflow-y: auto;
+            background: var(--bg-inner);
+            padding: 12px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+        }
+        .tags-pool::-webkit-scrollbar, .main-stage::-webkit-scrollbar, .card-caption::-webkit-scrollbar { width: 5px; height: 5px; }
+        .tags-pool::-webkit-scrollbar-thumb, .main-stage::-webkit-scrollbar-thumb, .card-caption::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
+
+        /* MULTICOLOR CAPSULE BUTTON VARIABLES */
+        .token {
+            background: #f0fdfa; /* Teal Mint base */
+            border: 1px solid #ccfbf1;
+            color: #115e59;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .token:hover { border-color: var(--accent-tag); transform: translateY(-1px); }
+        
+        .token.hashtag-type { 
+            background: #fdf2f8; /* Soft Rose Pink base */ 
+            color: #9f1239; 
+            border-color: #fce7f3; 
+        }
+        .token.hashtag-type:hover { border-color: var(--accent-hashtag); }
+
+        /* BUILDER STRUCTURAL EDITOR INPUTS */
+        .form-block { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+        .form-block label { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.02em; }
+        
+        .input-field {
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 12px 14px;
+            border-radius: 14px;
+            font-size: 13.5px;
+            outline: none;
+            width: 100%;
+            font-family: inherit;
+            line-height: 1.6;
+            resize: none; /* Disables resizing box icons */
+        }
+        .input-field:focus { border-color: var(--border-focus); background: #fff; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
+        textarea.input-field { min-height: 90px; }
+
+        .preset-row { display: flex; gap: 6px; margin-bottom: 12px; }
+        .action-pill {
+            background: #fff;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            font-size: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .action-pill:hover { border-color: var(--text-muted); color: var(--text-primary); }
+
+        /* RIGHT DOCK: LIVE STREAM PRESENTATION AREA */
+        .main-stage {
+            background: linear-gradient(135deg, #cbd5e1 0%, #e2e8f0 100%);
+            padding: 32px;
+            overflow-y: auto; /* Independent inner scrolling output stream */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .stage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .counter-pill {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            padding: 4px 14px;
+            font-size: 11px;
+            border-radius: 100px;
+            font-weight: 700;
+            color: var(--accent-glow);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        /* STREAM CARD DECK GRID */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: 24px;
+            align-items: start;
+        }
+
+        /* THE INDEPENDENTLY ISOLATED POSTCARD COMPONENT */
+        .variant-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.03), 0 4px 6px -2px rgba(15, 23, 42, 0.02);
+            min-height: 280px;
+            max-height: 380px; /* Locked constraint limits to stop height expansion clashing */
+        }
+        .variant-card:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.06); }
+        .card-idx { font-size: 10px; font-weight: 800; color: var(--accent-glow); text-transform: uppercase; letter-spacing: 0.05em; }
+        .card-title { font-size: 14.5px; font-weight: 700; color: var(--text-primary); line-height: 1.45; border-left: 3px solid var(--accent-glow); padding-left: 12px; }
+        .card-caption { font-size: 12.5px; color: var(--text-secondary); background: var(--bg-inner); border: 1px solid rgba(226, 232, 240, 0.8); padding: 14px; border-radius: 12px; white-space: pre-wrap; overflow-y: auto; flex: 1; line-height: 1.6; }
+
+        /* EXPORT MAIN BUTTON */
+        .primary-cta {
+            background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+            color: #ffffff;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 12px;
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+        }
+        .primary-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35); }
+
+        .canvas-fallback {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            border: 2px dashed rgba(148, 163, 184, 0.4);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 40px 20px;
+        }
+
+        .hidden { display: none !important; }
+        
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            opacity: 0;
+            transition: all 0.2s ease;
+            z-index: 1000;
+        }
+        #toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="brand">Studio<span>Reels</span></div>
+        <button id="downloadBtn" class="primary-cta hidden">Export Assets Package</button>
+    </div>
+
+    <div class="workspace">
+        
+        <div class="sidebar-dock">
+            <div>
+                <div class="section-title">📦 01 // Connect Matrix</div>
+                <label class="dropzone" id="dropZone">
+                    <p id="uploadStatus">Drop or browse <b>CSV dataset</b></p>
+                    <input type="file" id="csvFile" accept=".csv" class="hidden" />
+                </label>
+            </div>
+
+            <div id="step2" class="hidden" style="display:flex; flex-direction:column; max-height: 240px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span class="section-title" style="margin:0;">🏷️ 02 // Token Deck</span>
+                    <input type="text" id="tagSearch" placeholder="Filter fields..." class="input-field" style="max-width:110px; padding:4px 10px; font-size:11px; border-radius:8px;" />
+                </div>
+                <div class="tags-pool" id="tagsContainer"></div>
+            </div>
+
+            <div id="step3" class="hidden">
+                <div class="section-title">⚙️ 03 // Formatting Templates</div>
+                
+                <div class="preset-row">
+                    <button id="presetCup" class="action-pill">Tournament Formula</button>
+                    <button id="presetKit" class="action-pill">Kit Spotlight</button>
+                </div>
+
+                <div class="form-block">
+                    <label for="titleTemplate">Video Overlay Title Layout</label>
+                    <textarea id="titleTemplate" class="input-field">{country} is heading to FIFA World Cup '26!</textarea>
+                </div>
+
+                <div class="form-block">
+                    <label for="captionTemplate">Caption / Description Structure</label>
+                    <textarea id="captionTemplate" class="input-field" style="min-height: 140px;">Congratulations to {country} and the people!!
+
+#fifaworldcup #fifa #football #{country_hashtag} #{country_hashtag}football</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-stage">
+            <div class="stage-header">
+                <span class="section-title" style="margin:0; color:#475569;">✨ 04 // Live Output Copy Feeds</span>
+                <span id="matchCounter" class="counter-pill hidden">0 Variants Loaded</span>
+            </div>
+
+            <div id="canvasFallback" class="canvas-fallback">
+                <p style="font-size: 28px; margin: 0 0 8px 0;">📊</p>
+                <p style="margin: 0;">Ingest your dataset variables on the left pane dock to compile interactive video copies.</p>
+            </div>
+
+            <div class="cards-grid hidden" id="previewGrid"></div>
+        </div>
+
+    </div>
+
+    <div id="toast"></div>
+
+<script>
+    let parsedData = [];
+    let headers = [];
+    let generatedRecords = [];
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    document.getElementById('csvFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                parsedData = results.data;
+                if (parsedData.length > 0) {
+                    headers = Object.keys(parsedData[0]);
+                    
+                    document.getElementById('uploadStatus').innerHTML = `✨ <b>Linked Matrix:</b><br><span style="font-size:11px; color:var(--text-muted);">${file.name}</span>`;
+                    
+                    setupColumnTags();
+                    
+                    document.getElementById('step2').classList.remove('hidden');
+                    document.getElementById('step3').classList.remove('hidden');
+                    document.getElementById('previewGrid').classList.remove('hidden');
+                    document.getElementById('canvasFallback').classList.add('hidden');
+                    document.getElementById('downloadBtn').classList.remove('hidden');
+                    document.getElementById('matchCounter').classList.remove('hidden');
+
+                    processTemplates();
+                }
+            }
+        });
+    });
+
+    function setupColumnTags() {
+        const container = document.getElementById('tagsContainer');
+        container.innerHTML = '';
+        
+        headers.forEach(header => {
+            const tag = document.createElement('button');
+            tag.className = 'token tag-item';
+            tag.innerText = `{${header}}`;
+            tag.onclick = () => copyVar(`{${header}}`);
+            container.appendChild(tag);
+
+            const hashTag = document.createElement('button');
+            hashTag.className = 'token tag-item hashtag-type';
+            hashTag.innerText = `#${header}`;
+            hashTag.onclick = () => copyVar(`{${header}_hashtag}`);
+            container.appendChild(hashTag);
+        });
+    }
+
+    document.getElementById('tagSearch').addEventListener('input', function(e) {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('.tag-item').forEach(btn => {
+            btn.classList.toggle('hidden', !btn.innerText.toLowerCase().includes(q));
+        });
+    });
+
+    function copyVar(text) {
+        navigator.clipboard.writeText(text).then(() => showToast(`Copied token: ${text}`));
+    }
+
+    document.getElementById('presetCup').addEventListener('click', () => {
+        document.getElementById('titleTemplate').value = "{country} is heading to FIFA World Cup '26!";
+        document.getElementById('captionTemplate').value = "Congratulations to {country} and the people!!\n\n#fifaworldcup #fifa #football #{country_hashtag} #{country_hashtag}football";
+        processTemplates();
+    });
+
+    document.getElementById('presetKit').addEventListener('click', () => {
+        document.getElementById('titleTemplate').value = "{country} is rocking the fresh {kit_color_primary_name} kits!";
+        document.getElementById('captionTemplate').value = "Representing {continent} with style! Led by head coach {coach_name}, this squad is completely locked into {group}.\n\n#worldcup #{country_hashtag} #{continent_hashtag}";
+        processTemplates();
+    });
+
+    document.getElementById('titleTemplate').addEventListener('input', processTemplates);
+    document.getElementById('captionTemplate').addEventListener('input', processTemplates);
+
+    function processTemplates() {
+        if (parsedData.length === 0) return;
+
+        const titleTemplate = document.getElementById('titleTemplate').value;
+        const captionTemplate = document.getElementById('captionTemplate').value;
+
+        const activeHeaders = headers.filter(h => 
+            titleTemplate.includes(`{${h}}`) || titleTemplate.includes(`{${h}_hashtag}`) || 
+            captionTemplate.includes(`{${h}}`) || captionTemplate.includes(`{${h}_hashtag}`)
+        );
+
+        if (activeHeaders.length === 0 && headers.includes('country')) {
+            activeHeaders.push('country');
+        }
+
+        const uniqueKeys = new Set();
+        const deduplicatedData = [];
+
+        parsedData.forEach(row => {
+            const signature = activeHeaders.map(h => row[h]).join('|||');
+            if (!uniqueKeys.has(signature) && row[activeHeaders[0]]) {
+                uniqueKeys.add(signature);
+                deduplicatedData.push(row);
+            }
+        });
+
+        document.getElementById('matchCounter').innerText = `${deduplicatedData.length} Variant Layouts`;
+
+        generatedRecords = [];
+        const track = document.getElementById('previewGrid');
+        track.innerHTML = '';
+
+        deduplicatedData.forEach((row, index) => {
+            let evalMap = { ...row };
+            
+            headers.forEach(h => {
+                if (row[h]) {
+                    evalMap[`${h}_hashtag`] = row[h].toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+                } else {
+                    evalMap[`${h}_hashtag`] = '';
+                }
+            });
+
+            let finalTitle = titleTemplate;
+            let finalCaption = captionTemplate;
+
+            Object.keys(evalMap).forEach(key => {
+                const searchStr = `{${key}}`;
+                finalTitle = finalTitle.split(searchStr).join(evalMap[key] || '');
+                finalCaption = finalCaption.split(searchStr).join(evalMap[key] || '');
+            });
+
+            let outputRow = {};
+            activeHeaders.forEach(h => outputRow[h] = row[h]);
+            outputRow['Generated_Title'] = finalTitle;
+            outputRow['Generated_Caption'] = finalCaption;
+            generatedRecords.push(outputRow);
+
+            const card = document.createElement('div');
+            card.className = "variant-card";
+            card.innerHTML = `
+                <div class="card-idx">Asset Card Layout #${index + 1}</div>
+                <div class="card-title">${finalTitle || 'Untitled'}</div>
+                <div class="card-caption">${finalCaption || 'No Caption'}</div>
+            `;
+            track.appendChild(card);
+        });
+    }
+
+    document.getElementById('downloadBtn').addEventListener('click', function() {
+        if (generatedRecords.length === 0) return;
+        
+        const csvString = Papa.unparse(generatedRecords);
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", "studio_reels_output.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("Exported dynamic metadata package!");
+    });
+</script>
+</body>
+</html>
