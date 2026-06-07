@@ -1,4 +1,4 @@
-# 🎬 Social Reel Template Generator
+# 🎬 CSV to Social Reel Captions 
 
 A lightning-fast, zero-dependency visual web utility built to mass-generate structured social media titles, captions, and dynamic hashtags straight from any columnized CSV dataset. 
 
